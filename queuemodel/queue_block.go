@@ -2,15 +2,18 @@ package queuemodel
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/myfantasy/mffc/fh"
+	"github.com/myfantasy/mfq/queue"
 	"github.com/myfantasy/mft"
+	"github.com/myfantasy/mft/im"
 )
 
-// QueueBlock - block of items of queue
+// QueueBlock - block of queue.Items of queue
 type QueueBlock struct {
 	ID int64 `json:"id"`
 
@@ -19,7 +22,7 @@ type QueueBlock struct {
 	Count  int       `json:"count"`
 	Size   int       `json:"size"`
 
-	Items []Item `json:"-"`
+	Items []queue.Item `json:"-"`
 
 	mx  sync.RWMutex
 	mxF sync.RWMutex
@@ -30,6 +33,8 @@ type QueueBlock struct {
 
 	IsLoaded bool      `json:"-"`
 	LastUse  time.Time `json:"-"`
+
+	NeedRemove bool `json:"need_remove"`
 }
 
 // QueueBlockCreate QueueBlock create
@@ -38,7 +43,7 @@ func QueueBlockCreate(data []byte, rvg *mft.G) *QueueBlock {
 		IsLoaded: true,
 		ID:       rvg.RvGet(),
 		Create:   time.Now(),
-		Items:    make([]Item, 0),
+		Items:    make([]queue.Item, 0),
 		Rvg:      rvg,
 	}
 
@@ -106,7 +111,7 @@ func (qb *QueueBlock) AddRaw(data []byte) (err *mft.Error) {
 		return mft.ErrorCS(100001, "Block is Unloaded")
 	}
 
-	i := Item{
+	i := queue.Item{
 		Data: data,
 		DT:   time.Now(),
 		ID:   qb.Rvg.RvGet(),
@@ -256,11 +261,26 @@ func (qb *QueueBlock) Load(fp fh.FileProvider, path string) (err *mft.Error) {
 	return qb.LoadRaw(fp, path)
 }
 
+// LoadIfNeed block from disk to memory if not loaded; if NeedRemove then do nothing
+func (qb *QueueBlock) LoadIfNeed(fp fh.FileProvider, path string) (err *mft.Error) {
+	qb.mx.Lock()
+	defer qb.mx.Unlock()
+
+	if qb.NeedRemove {
+		return nil
+	}
+
+	if qb.IsLoaded {
+		return nil
+	}
+	return qb.LoadRaw(fp, path)
+}
+
 // UnloadRaw block from memory
 func (qb *QueueBlock) UnloadRaw() bool {
 
 	if qb.IsLoaded && !qb.NeedSave {
-		qb.Items = make([]Item, 0)
+		qb.Items = make([]queue.Item, 0)
 		qb.IsLoaded = false
 	}
 
@@ -334,4 +354,39 @@ func (qb *QueueBlock) Check(l int, maxL int, maxCnt int, maxD time.Duration) boo
 	defer qb.mx.Unlock()
 
 	return qb.CheckRaw(l, maxL, maxCnt, maxD)
+}
+
+// IndexBefor true when index bafor this block and not NeedRemove
+func (qb *QueueBlock) IndexBefor(i int64) bool {
+	return i < qb.ID && (!qb.NeedRemove)
+}
+
+// FindElenment find element
+func (qb *QueueBlock) FindElenment(id int64, cnt int, include bool) (itms []queue.Item, ok bool) {
+
+	itms = make([]queue.Item, 0)
+	if qb.NeedRemove {
+		return itms, false
+	}
+
+	n := len(qb.Items)
+
+	if n == 0 {
+		return itms, false
+	}
+	idx := sort.Search(n, func(i int) bool {
+		return qb.Items[i].IndexBefor(id)
+	})
+
+	if idx == 0 {
+		return qb.Items[0:im.Min(cnt, n)], true
+	}
+	if include && qb.Items[idx-1].ID == id {
+		return qb.Items[idx-1 : im.Min(cnt+idx-1, n)], true
+	}
+	if idx < n {
+		return qb.Items[idx:im.Min(cnt+idx, n)], true
+	}
+
+	return itms, false
 }

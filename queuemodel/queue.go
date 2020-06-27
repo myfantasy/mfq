@@ -2,10 +2,12 @@ package queuemodel
 
 import (
 	"encoding/json"
+	"sort"
 	"sync"
 	"time"
 
 	"github.com/myfantasy/mffc/fh"
+	"github.com/myfantasy/mfq/queue"
 	"github.com/myfantasy/mft"
 )
 
@@ -333,10 +335,61 @@ func (q *Queue) SaveRaw() (err *mft.Error) {
 	return nil
 }
 
-// Save save block on disk
-func (q *Queue) Save() (err *mft.Error) {
-	q.mx.Lock()
-	defer q.mx.Unlock()
+// Get queue.Items from queue from KEY INCLUDE this key (or more only) and not more then COUNT
+func (q *Queue) Get(key int64, include bool, count int) (itms []queue.Item, ok bool, err *mft.Error) {
 
-	return q.SaveRaw()
+	qb, ok, erS := q.FindBlock(key, include)
+
+	if erS != nil {
+		return nil, false, erS
+	}
+
+	if !ok {
+		return make([]queue.Item, 0), ok, nil
+	}
+
+	er0 := qb.LoadIfNeed(q.fp, q.Path)
+	if er0 != nil {
+		return nil, false, erS
+	}
+
+	itms, ok = qb.FindElenment(key, count, include)
+
+	return itms, ok, nil
+}
+
+// FindBlock find block with key
+func (q *Queue) FindBlock(key int64, include bool) (qb *QueueBlock, ok bool, err *mft.Error) {
+	if len(q.Blocks) == 0 {
+		return nil, false, nil
+	}
+
+	if len(q.Blocks) == 0 {
+		return nil, false, nil
+	}
+
+	idx := sort.Search(len(q.Blocks), func(i int) bool {
+		return q.Blocks[i].IndexBefor(key)
+	})
+
+	if idx >= len(q.Blocks) {
+		return nil, false, nil
+	}
+
+	if idx == 0 {
+		return q.Blocks[idx], true, nil
+	}
+
+	er0 := q.Blocks[idx-1].LoadIfNeed(q.fp, q.Path)
+	if er0 != nil {
+		return nil, false, er0
+	}
+
+	_, okE := q.Blocks[idx-1].FindElenment(key, 1, include)
+
+	if okE {
+		return q.Blocks[idx-1], true, nil
+	}
+
+	return q.Blocks[idx], true, nil
 }
