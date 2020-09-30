@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/myfantasy/mffc/fod"
+	"github.com/myfantasy/mfq/queue"
 	"github.com/myfantasy/mft"
 
 	log "github.com/sirupsen/logrus"
@@ -22,7 +23,7 @@ func TestQueue(t *testing.T) {
 
 	// t.Fatal("Step0")
 
-	q, er0 := QueueCreate(rvg, fod, "test/tq1/", SaveBackgroundWait, log.New(), 1e6, 1e4, time.Minute*10, time.Millisecond*300)
+	q, er0 := QueueCreate(rvg, fod, "test/tq1/", queue.SaveBackgroundWait, log.New(), 1e6, 1e4, time.Minute*10, time.Millisecond*300)
 
 	if er0 != nil {
 		t.Fatal("QueueCreate", er0)
@@ -63,7 +64,7 @@ func BenchmarkQueueSaveBackgroundWait(b *testing.B) {
 
 	// t.Fatal("Step0")
 
-	q, er0 := QueueCreate(rvg, fod, "test/tq2/", SaveBackgroundWait, log.New(), 1e6, 1e4, time.Minute*10, time.Millisecond*300)
+	q, er0 := QueueCreate(rvg, fod, "test/tq2/", queue.SaveBackgroundWait, log.New(), 1e6, 1e4, time.Minute*10, time.Millisecond*300)
 
 	if er0 != nil {
 		b.Fatal("QueueCreate", er0)
@@ -88,7 +89,7 @@ func BenchmarkQueueSaveBackground(b *testing.B) {
 
 	// t.Fatal("Step0")
 
-	q, er0 := QueueCreate(rvg, fod, "test/tq3/", SaveBackground, log.New(), 1e7, 1e4, time.Minute*10, time.Millisecond*300)
+	q, er0 := QueueCreate(rvg, fod, "test/tq3/", queue.SaveBackground, log.New(), 1e7, 1e4, time.Minute*10, time.Millisecond*300)
 
 	if er0 != nil {
 		b.Fatal("QueueCreate", er0)

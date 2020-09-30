@@ -11,16 +11,6 @@ import (
 	"github.com/myfantasy/mft"
 )
 
-const (
-	// SaveBackgroundWait save background after add and wait for save
-	SaveBackgroundWait int = 0
-
-	// SaveImmediately save immediately after add
-	SaveImmediately int = 1
-	// SaveBackground save background after add
-	SaveBackground int = 2
-)
-
 // Queue - очередь
 type Queue struct {
 	Blocks []*QueueBlock `json:"blocks"`
@@ -259,13 +249,13 @@ func (q *Queue) Add(data []byte) (err *mft.Error) {
 		q.mx.Unlock()
 	}
 
-	if q.SaveType == SaveImmediately {
+	if q.SaveType == queue.SaveImmediately {
 		q.addSaveWait(qb)
 		erOut := q.SaveAllIlockRaw()
 		return erOut
 	}
 
-	if q.SaveType == SaveBackground {
+	if q.SaveType == queue.SaveBackground {
 		q.addSaveWait(qb)
 		return nil
 	}
